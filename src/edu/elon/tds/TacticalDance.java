@@ -169,7 +169,7 @@ public class TacticalDance extends Activity implements Callback {
             if (mType == 0) {
                 mConnection.startServer(4, connectedListener, maxConnectionsListener,
                         dataReceivedListener, disconnectedListener);
-                self.setTitle("Air Hockey: " + mConnection.getName() + "-" + mConnection.getAddress());
+                self.setTitle("Tactical Dance Sim 2K5: " + mConnection.getName() + "-" + mConnection.getAddress());
             } else {
                 WindowManager w = getWindowManager();
                 Display d = w.getDefaultDisplay();
