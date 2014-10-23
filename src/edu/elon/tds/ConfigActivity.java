@@ -70,6 +70,6 @@ public class ConfigActivity extends Activity {
         });
 
 
-
     }
+
 }
