@@ -323,8 +323,8 @@ public class TacticalDance extends Activity implements Callback {
 							if (System.currentTimeMillis() - oldTime >= 5000) {
 								newSong = false;
 								currentThresh = (int) (Math.random() * 3);
-								switchSong();
 								sendMessage("CurrentThresh", currentThresh + "");
+								switchSong();
 								
 							}
 						}
@@ -350,10 +350,9 @@ public class TacticalDance extends Activity implements Callback {
 			songs.setDataSource(song.getFileDescriptor(),
 					song.getStartOffset(), song.getDeclaredLength());
 			songs.prepare();
-			if(TYPE == 0) {
-				// trying to make the music sync better accross phones.
-				// to make for delay in message being reseaved.
-				Thread.sleep(350);
+			if(TYPE == 1) {
+				// Compensate for Bluetooth speed
+				Thread.sleep(150);
 			}
 			songs.start();
 		} catch (IllegalStateException e) {
