@@ -19,6 +19,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.DialogInterface.OnClickListener;
+import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -55,7 +56,7 @@ public class TacticalDance extends Activity implements Callback {
 
 	private TacticalDance self;
 
-	private int mType; // 0 = server, 1 = client
+	private int TYPE; // 0 = server, 1 = client
 
 	private SurfaceView mSurface;
 
@@ -71,23 +72,30 @@ public class TacticalDance extends Activity implements Callback {
 
 	private SoundPool mSoundPool;
 
-	private MediaPlayer mPlayer;
+	private ArrayList<AssetFileDescriptor> songList;
+
+	private MediaPlayer songs;
 
 	private SensorManager sensorManager;
 	private SensorEventListener sensorListener;
 
 	private final float[] THRESHOLDS = { 10, 12, 15 };
-	private final int low = 0;
+	private final int THRESHOLD_LOW = 0;
 	private final int med = 1;
-	private final int high = 2;
-	private int currentThresh = low;
+	private int currentThresh = THRESHOLD_LOW;
 
-	private float oldTime = System.currentTimeMillis();
-	private boolean isRunning = false;
+	private long oldTime = 0;
+	private boolean newSong = false;
+
+	GameLoop gLoop;
 
 	private OnMessageReceivedListener dataReceivedListener = new OnMessageReceivedListener() {
 		public void OnMessageReceived(String device, String message) {
-
+			String[] array =message.split(":");
+			if(array[0].equals("CurrentThresh")) {
+				currentThresh = Integer.parseInt(array[1]);
+				switchSong();
+			}
 		}
 	};
 
@@ -138,7 +146,7 @@ public class TacticalDance extends Activity implements Callback {
 
 	private OnConnectionServiceReadyListener serviceReadyListener = new OnConnectionServiceReadyListener() {
 		public void OnConnectionServiceReady() {
-			if (mType == 0) {
+			if (TYPE == 0) {
 				mConnection.startServer(4, connectedListener,
 						maxConnectionsListener, dataReceivedListener,
 						disconnectedListener);
@@ -153,6 +161,12 @@ public class TacticalDance extends Activity implements Callback {
 			}
 		}
 	};
+
+	private void sendMessage(String messageType, String message) {
+		for (String device : rivalDevices) {
+			mConnection.sendMessage(device, messageType + ":" + message);
+		}
+	}
 
 	private class SensorListener implements SensorEventListener {
 
@@ -174,20 +188,6 @@ public class TacticalDance extends Activity implements Callback {
 				Toast.makeText(getApplicationContext(), "YOU SUCK",
 						Toast.LENGTH_LONG);
 			}
-			
-			if (!isRunning) {
-				oldTime = System.currentTimeMillis();
-				isRunning = true;
-				System.out.println(isRunning + "" + oldTime);
-			}
-			else {
-				if (System.currentTimeMillis() - oldTime >= 20000) {
-					isRunning = false;
-					currentThresh = (int) (Math.random() * 3);
-					mPlayer.stop();
-					System.out.println("OKAY M EFFER U CAN STOP NOW");
-				}
-			}
 
 		}
 
@@ -207,7 +207,7 @@ public class TacticalDance extends Activity implements Callback {
 		self = this;
 
 		Intent startingIntent = getIntent();
-		mType = startingIntent.getIntExtra("TYPE", 0);
+		TYPE = startingIntent.getIntExtra("TYPE", 0);
 
 		setContentView(R.layout.main);
 		mSurface = (SurfaceView) findViewById(R.id.surface);
@@ -216,12 +216,17 @@ public class TacticalDance extends Activity implements Callback {
 		bgPaint = new Paint();
 		bgPaint.setColor(Color.BLACK);
 
-		mPlayer = MediaPlayer.create(this, R.raw.level3);
+		songList = new ArrayList<AssetFileDescriptor>();
+		songList.add(this.getResources().openRawResourceFd(R.raw.level1));
+		songList.add(this.getResources().openRawResourceFd(R.raw.level2));
+		songList.add(this.getResources().openRawResourceFd(R.raw.level3));
+
+		songs = MediaPlayer.create(this, R.raw.level1);
 
 		mConnection = new Connection(this, serviceReadyListener);
 		mHolder.addCallback(self);
 
-		mPlayer.start();
+		songs.start();
 	}
 
 	@Override
@@ -229,22 +234,44 @@ public class TacticalDance extends Activity implements Callback {
 		if (mConnection != null) {
 			mConnection.shutdown();
 		}
-		if (mPlayer != null) {
-			mPlayer.release();
+
+		if (songs != null) {
+			songs.release();
+
 		}
 		super.onDestroy();
 	}
 
 	public void surfaceCreated(SurfaceHolder holder) {
-
+		gLoop = new GameLoop();
+		gLoop.start();
 	}
 
 	private void doDraw(Canvas c) {
+		// do some drawin stuff like...
+		c.drawRect(0, 0, c.getWidth(), c.getHeight(), bgPaint);
+	}
 
+	private void draw() {
+		Canvas canvas = null;
+		try {
+			canvas = mHolder.lockCanvas();
+			if (canvas != null) {
+				doDraw(canvas);
+			}
+		} finally {
+			if (canvas != null) {
+				mHolder.unlockCanvasAndPost(canvas);
+			}
+		}
 	}
 
 	public void surfaceDestroyed(SurfaceHolder holder) {
-
+		try {
+			gLoop.safeStop();
+		} finally {
+			gLoop = null;
+		}
 	}
 
 	public void surfaceChanged(SurfaceHolder holder, int format, int width,
@@ -275,4 +302,69 @@ public class TacticalDance extends Activity implements Callback {
 		return false;
 	}
 
+	private class GameLoop extends Thread {
+		private volatile boolean running = true;
+
+		@Override
+		public void run() {
+			while (running) {
+				try {
+					Thread.sleep(5);
+					draw();
+					// doin some update stuff
+					if (TYPE == 0) {
+						if (!newSong) {
+							oldTime = 0 + System.currentTimeMillis();
+							newSong = true;
+							System.out.println(newSong + "" + oldTime);
+						} else {
+							// System.out.println(System.currentTimeMillis() -
+							// oldTime);
+							if (System.currentTimeMillis() - oldTime >= 5000) {
+								newSong = false;
+								currentThresh = (int) (Math.random() * 3);
+								switchSong();
+								sendMessage("CurrentThresh", currentThresh + "");
+								
+							}
+						}
+					}
+
+				} catch (InterruptedException ie) {
+					running = false;
+				}
+			}
+		}
+
+		public void safeStop() {
+			running = false;
+			interrupt();
+		}
+	}
+
+	private void switchSong() {
+		try {
+			songs.stop();
+			songs.reset();
+			AssetFileDescriptor song = songList.get(currentThresh);
+			songs.setDataSource(song.getFileDescriptor(),
+					song.getStartOffset(), song.getDeclaredLength());
+			songs.prepare();
+			if(TYPE == 0) {
+				// trying to make the music sync better accross phones.
+				// to make for delay in message being reseaved.
+				Thread.sleep(350);
+			}
+			songs.start();
+		} catch (IllegalStateException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 }
