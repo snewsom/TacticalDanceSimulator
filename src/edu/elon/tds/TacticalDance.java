@@ -38,6 +38,7 @@ import android.view.Display;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
 import android.view.WindowManager;
 import android.view.SurfaceHolder.Callback;
 import android.view.WindowManager.BadTokenException;
@@ -82,8 +83,10 @@ public class TacticalDance extends Activity implements Callback {
 	private final int high = 2;
 	private int currentThresh = low;
 
-	private float oldTime = System.currentTimeMillis();
+	private long oldTime = System.currentTimeMillis();
 	private boolean isRunning = false;
+	private float sum = 0;
+	private int count = 0;
 
 	private OnMessageReceivedListener dataReceivedListener = new OnMessageReceivedListener() {
 		public void OnMessageReceived(String device, String message) {
@@ -164,15 +167,25 @@ public class TacticalDance extends Activity implements Callback {
 
 		@Override
 		public void onSensorChanged(SensorEvent se) {
-			// algorithm for seeing if phone is jostled
+			// (rough) algorithm for seeing if phone is jostled
+			// takes 20 measurements. if the average of those 
+			// 20 measurements is > threshold, you lose
 			float x = Math.abs(se.values[0]);
 			float y = Math.abs(se.values[1]);
 			float z = Math.abs(se.values[2]);
-			float sum = (x + y + z) - sensorManager.GRAVITY_EARTH;
+			sum += (x + y + z) - sensorManager.GRAVITY_EARTH;
+			count+=1;
 			// System.out.println(sum);
-			if (sum > THRESHOLDS[currentThresh]) {
-				Toast.makeText(getApplicationContext(), "YOU SUCK",
-						Toast.LENGTH_LONG);
+			
+			if(count>=20){
+				if (sum/20 > THRESHOLDS[currentThresh]) {
+					Toast.makeText(getApplicationContext(), "YOU SUCK",
+							Toast.LENGTH_LONG).show();
+
+					mSurface.setBackgroundColor(Color.BLACK);
+				}
+				count = 0;
+				sum = 0;
 			}
 			
 			if (!isRunning) {
@@ -181,16 +194,40 @@ public class TacticalDance extends Activity implements Callback {
 				System.out.println(isRunning + "" + oldTime);
 			}
 			else {
-				if (System.currentTimeMillis() - oldTime >= 20000) {
-					isRunning = false;
-					currentThresh = (int) (Math.random() * 3);
-					mPlayer.stop();
-					System.out.println("OKAY M EFFER U CAN STOP NOW");
+				//System.out.println(System.currentTimeMillis() - oldTime);
+				//set to 5s for testing purposes. CHANGE BACK
+				if (System.currentTimeMillis() - oldTime >= 5000) {
+					changePace();
 				}
 			}
 
 		}
 
+	}
+	
+	/**
+	 * Called every 20s to update the screen, music, and thresholds.
+	 * is currently called by onSensorChanged(). probably needs to be
+	 * called in update() method of nonexistent game loop.
+	 */
+	public void changePace(){
+		isRunning = false;
+		currentThresh = (int) (Math.random() * 3);
+		mPlayer.stop();
+		System.out.println("OKAY M EFFER U CAN STOP NOW");
+		System.out.println(currentThresh);
+		
+		//change song and background depending on threshold
+		if(currentThresh==0){
+			//mPlayer = MediaPlayer.create(this, R.raw.level1);
+			mSurface.setBackgroundColor(Color.RED);
+		}else if(currentThresh==1){
+			//mPlayer = MediaPlayer.create(this, R.raw.level2);
+			mSurface.setBackgroundColor(Color.YELLOW);
+		}else{
+			mPlayer = MediaPlayer.create(this, R.raw.level3);
+			bgPaint.setColor(Color.GREEN);
+		}
 	}
 
 	/** Called when the activity is first created. */
@@ -214,8 +251,10 @@ public class TacticalDance extends Activity implements Callback {
 		mHolder = mSurface.getHolder();
 
 		bgPaint = new Paint();
-		bgPaint.setColor(Color.BLACK);
-
+		bgPaint.setColor(Color.GREEN);
+		
+		mSurface.setBackgroundColor(Color.GREEN);
+		
 		mPlayer = MediaPlayer.create(this, R.raw.level3);
 
 		mConnection = new Connection(this, serviceReadyListener);
