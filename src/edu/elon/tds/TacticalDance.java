@@ -12,7 +12,6 @@ import net.clc.bt.R.drawable;
 import net.clc.bt.R.id;
 import net.clc.bt.R.layout;
 import net.clc.bt.R.raw;
-
 import android.app.Activity;
 import android.app.AlertDialog.Builder;
 import android.content.Context;
@@ -34,8 +33,11 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.SoundPool;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.util.Log;
 import android.view.Display;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -43,6 +45,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.view.SurfaceHolder.Callback;
 import android.view.WindowManager.BadTokenException;
+import android.widget.Button;
 import android.widget.Toast;
 
 import java.io.FileDescriptor;
@@ -80,23 +83,36 @@ public class TacticalDance extends Activity implements Callback {
 	private SensorManager sensorManager;
 	private SensorEventListener sensorListener;
 
+	private Vibrator v;
+
+	public boolean isWinning = true;
+	public boolean gameStarted = false;
+
 	private final float[] THRESHOLDS = { 10, 12, 15 };
 	private final int THRESHOLD_LOW = 0;
-	private final int med = 1;
+	private final int THRESHOLD_MED = 1;
+	private final int THRESHOLD_HIGH = 2;
 	private int currentThresh = THRESHOLD_LOW;
+	
+	private int delayTime = 0;
 
-	private long oldTime = System.currentTimeMillis();
-	private boolean isRunning = false;
-	private float sum = 0;
-	private int count = 0;
+	private long oldTime = 0;
+	private boolean newSong = false;
+
 	GameLoop gLoop;
 
 	private OnMessageReceivedListener dataReceivedListener = new OnMessageReceivedListener() {
 		public void OnMessageReceived(String device, String message) {
-			String[] array =message.split(":");
-			if(array[0].equals("CurrentThresh")) {
+			String[] array = message.split(":");
+			if (array[0].equals("CurrentThresh")) {
 				currentThresh = Integer.parseInt(array[1]);
+				delayTime = (int) (System.currentTimeMillis() - Long.parseLong(array[3]));
+				delayTime = Math.abs(delayTime);
+				System.out.println("delay time: " + delayTime);
 				switchSong();
+			}
+			if (array[0].equals("RestartGame")) {
+				restartGame();
 			}
 		}
 	};
@@ -112,9 +128,12 @@ public class TacticalDance extends Activity implements Callback {
 			if (!rivalDevices.contains(device)) {
 				rivalDevices.add(device);
 			}
+			// for debug
 			for (String s : rivalDevices) {
 				System.out.println(s);
 			}
+			gameStarted = true;
+			switchSong();
 		}
 	};
 
@@ -155,12 +174,14 @@ public class TacticalDance extends Activity implements Callback {
 				self.setTitle("Tactical Dance Sim 2K5: "
 						+ mConnection.getName() + "-"
 						+ mConnection.getAddress());
+
 			} else {
 				Intent serverListIntent = new Intent(self,
 						ServerListActivity.class);
 				startActivityForResult(serverListIntent,
 						SERVER_LIST_RESULT_CODE);
 			}
+
 		}
 	};
 
@@ -180,73 +201,36 @@ public class TacticalDance extends Activity implements Callback {
 
 		@Override
 		public void onSensorChanged(SensorEvent se) {
-			// (rough) algorithm for seeing if phone is jostled
-			// takes 20 measurements. if the average of those 
-			// 20 measurements is > threshold, you lose
-			float x = Math.abs(se.values[0]);
-			float y = Math.abs(se.values[1]);
-			float z = Math.abs(se.values[2]);
-			sum += (x + y + z) - sensorManager.GRAVITY_EARTH;
-			count+=1;
-			// System.out.println(sum);
-			
-			if(count>=20){
-				if (sum/20 > THRESHOLDS[currentThresh]) {
-					Toast.makeText(getApplicationContext(), "YOU SUCK",
-							Toast.LENGTH_LONG).show();
-
-					mSurface.setBackgroundColor(Color.BLACK);
-				}
-				count = 0;
-				sum = 0;
-			}
-			
-			if (!isRunning) {
-				oldTime = System.currentTimeMillis();
-				isRunning = true;
-				System.out.println(isRunning + "" + oldTime);
-			}
-			else {
-				//System.out.println(System.currentTimeMillis() - oldTime);
-				//set to 5s for testing purposes. CHANGE BACK
-				if (System.currentTimeMillis() - oldTime >= 5000) {
-					changePace();
+			// algorithm for seeing if phone is jostled
+			if (isWinning && gameStarted) {
+				float x = Math.abs(se.values[0]);
+				float y = Math.abs(se.values[1]);
+				float z = Math.abs(se.values[2]);
+				float sum = (x + y + z) - sensorManager.GRAVITY_EARTH;
+				// System.out.println(sum);
+				if (sum > THRESHOLDS[currentThresh]) {
+					v.vibrate(500);
+					bgPaint.setColor(Color.CYAN);
+					isWinning = false;
 				}
 			}
-
 		}
 
 	}
-	
-	/**
-	 * Called every 20s to update the screen, music, and thresholds.
-	 * is currently called by onSensorChanged(). probably needs to be
-	 * called in update() method of nonexistent game loop.
-	 */
-	public void changePace(){
-		isRunning = false;
-		currentThresh = (int) (Math.random() * 3);
-		mPlayer.stop();
-		System.out.println("OKAY M EFFER U CAN STOP NOW");
-		System.out.println(currentThresh);
-		
-		//change song and background depending on threshold
-		if(currentThresh==0){
-			//mPlayer = MediaPlayer.create(this, R.raw.level1);
-			mSurface.setBackgroundColor(Color.RED);
-		}else if(currentThresh==1){
-			//mPlayer = MediaPlayer.create(this, R.raw.level2);
-			mSurface.setBackgroundColor(Color.YELLOW);
-		}else{
-			mPlayer = MediaPlayer.create(this, R.raw.level3);
-			bgPaint.setColor(Color.GREEN);
+
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		if (TYPE == 0) {
+			getMenuInflater().inflate(R.menu.main, menu);
 		}
+		return true;
 	}
 
 	/** Called when the activity is first created. */
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		setContentView(R.layout.main);
 
 		sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
 		sensorListener = new SensorListener();
@@ -256,6 +240,7 @@ public class TacticalDance extends Activity implements Callback {
 
 		self = this;
 
+		v = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
 		Intent startingIntent = getIntent();
 		TYPE = startingIntent.getIntExtra("TYPE", 0);
 
@@ -264,11 +249,7 @@ public class TacticalDance extends Activity implements Callback {
 		mHolder = mSurface.getHolder();
 
 		bgPaint = new Paint();
-		bgPaint.setColor(Color.GREEN);
-		
-		mSurface.setBackgroundColor(Color.GREEN);
-		
-		mPlayer = MediaPlayer.create(this, R.raw.level3);
+		bgPaint.setColor(Color.MAGENTA);
 
 		songList = new ArrayList<AssetFileDescriptor>();
 		songList.add(this.getResources().openRawResourceFd(R.raw.level1));
@@ -280,7 +261,7 @@ public class TacticalDance extends Activity implements Callback {
 		mConnection = new Connection(this, serviceReadyListener);
 		mHolder.addCallback(self);
 
-		songs.start();
+		
 	}
 
 	@Override
@@ -294,6 +275,12 @@ public class TacticalDance extends Activity implements Callback {
 
 		}
 		super.onDestroy();
+	}
+
+	@Override
+	protected void onPause() {
+		v.cancel();
+		super.onPause();
 	}
 
 	public void surfaceCreated(SurfaceHolder holder) {
@@ -345,6 +332,8 @@ public class TacticalDance extends Activity implements Callback {
 						.show();
 			} else {
 				// TODO i dont know if i wanna set host here
+				gameStarted = true;
+				songs.start();
 				hostDevice = device;
 			}
 			return;
@@ -365,8 +354,7 @@ public class TacticalDance extends Activity implements Callback {
 				try {
 					Thread.sleep(5);
 					draw();
-					// doin some update stuff
-					if (TYPE == 0) {
+					if (TYPE == 0 && gameStarted) {
 						if (!newSong) {
 							oldTime = 0 + System.currentTimeMillis();
 							newSong = true;
@@ -377,9 +365,9 @@ public class TacticalDance extends Activity implements Callback {
 							if (System.currentTimeMillis() - oldTime >= 5000) {
 								newSong = false;
 								currentThresh = (int) (Math.random() * 3);
-								sendMessage("CurrentThresh", currentThresh + "");
 								switchSong();
 								
+
 							}
 						}
 					}
@@ -396,6 +384,19 @@ public class TacticalDance extends Activity implements Callback {
 		}
 	}
 
+	public boolean serverRestartGame(MenuItem menuItem) {
+		sendMessage("RestartGame", "");
+		restartGame();
+		return true;
+	}
+
+	public void restartGame() {
+		currentThresh = 0;
+		isWinning = true;
+		bgPaint.setColor(Color.MAGENTA);
+		switchSong();
+	}
+
 	private void switchSong() {
 		try {
 			songs.stop();
@@ -404,18 +405,19 @@ public class TacticalDance extends Activity implements Callback {
 			songs.setDataSource(song.getFileDescriptor(),
 					song.getStartOffset(), song.getDeclaredLength());
 			songs.prepare();
-			if(TYPE == 1) {
-				// Compensate for Bluetooth speed
-				Thread.sleep(150);
+			if (TYPE == 1) {
+				// trying to make the music sync better accross phones.
+				// to make for delay in message being reseaved.
+				songs.seekTo(delayTime);
 			}
+
+			sendMessage("CurrentThresh", currentThresh + ":Systime:" + System.currentTimeMillis());
 			songs.start();
+
 		} catch (IllegalStateException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}

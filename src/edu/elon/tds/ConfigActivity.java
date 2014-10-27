@@ -52,7 +52,6 @@ public class ConfigActivity extends Activity {
         Button startTacticalServer = (Button) findViewById(R.id.start_tactical_dance_server);
         startTacticalServer.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
-                //Intent serverIntent = new Intent(self, Demo_Multiscreen.class);
                 Intent serverIntent = new Intent(self, TacticalDance.class);
                 serverIntent.putExtra("TYPE", 0);
                 startActivity(serverIntent);
@@ -62,7 +61,6 @@ public class ConfigActivity extends Activity {
         Button startTacticalDanceClient = (Button) findViewById(R.id.start_tactical_dance_client);
         startTacticalDanceClient.setOnClickListener(new OnClickListener() {
             public void onClick(View v) {
-                //Intent clientIntent = new Intent(self, Demo_Multiscreen.class);
                 Intent clientIntent = new Intent(self, TacticalDance.class);
                 clientIntent.putExtra("TYPE", 1);
                 startActivity(clientIntent);
