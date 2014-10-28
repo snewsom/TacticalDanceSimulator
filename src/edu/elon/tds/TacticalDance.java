@@ -88,16 +88,21 @@ public class TacticalDance extends Activity implements Callback {
 	public boolean isWinning = true;
 	public boolean gameStarted = false;
 
-	private final float[] THRESHOLDS = { 10, 12, 15 };
+	private final float[] THRESHOLDS = { 12, 20, 30 };
 	private final int THRESHOLD_LOW = 0;
 	private final int THRESHOLD_MED = 1;
 	private final int THRESHOLD_HIGH = 2;
 	private int currentThresh = THRESHOLD_LOW;
-	
+
 	private int delayTime = 0;
 
 	private long oldTime = 0;
 	private boolean newSong = false;
+
+	float sum = 0;
+	int count = 0;
+	
+	int winningDevices;
 
 	GameLoop gLoop;
 
@@ -106,14 +111,22 @@ public class TacticalDance extends Activity implements Callback {
 			String[] array = message.split(":");
 			if (array[0].equals("CurrentThresh")) {
 				currentThresh = Integer.parseInt(array[1]);
-				delayTime = (int) (System.currentTimeMillis() - Long.parseLong(array[3]));
+				delayTime = (int) (System.currentTimeMillis() - Long
+						.parseLong(array[3]));
 				delayTime = Math.abs(delayTime);
 				System.out.println("delay time: " + delayTime);
-				switchSong();
+				if(isWinning){
+					switchSong();
+				}
 			}
 			if (array[0].equals("RestartGame")) {
 				restartGame();
 			}
+			//received if client devices lose
+			if(message.equals("Update:Lost")){
+				winningDevices--;
+			}
+			
 		}
 	};
 
@@ -206,12 +219,21 @@ public class TacticalDance extends Activity implements Callback {
 				float x = Math.abs(se.values[0]);
 				float y = Math.abs(se.values[1]);
 				float z = Math.abs(se.values[2]);
-				float sum = (x + y + z) - sensorManager.GRAVITY_EARTH;
+				sum += (x + y + z) - sensorManager.GRAVITY_EARTH;
+				count++;
 				// System.out.println(sum);
-				if (sum > THRESHOLDS[currentThresh]) {
-					v.vibrate(500);
-					bgPaint.setColor(Color.CYAN);
-					isWinning = false;
+				if (count >= 10) {
+					if (sum / count > THRESHOLDS[currentThresh]) {
+						songs.stop();
+						v.vibrate(500);
+						bgPaint.setColor(Color.CYAN);
+						isWinning = false;
+						sendMessage("Update","Lost");
+						
+
+					}
+					count = 0;
+					sum = 0;
 				}
 			}
 		}
@@ -243,6 +265,7 @@ public class TacticalDance extends Activity implements Callback {
 		v = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
 		Intent startingIntent = getIntent();
 		TYPE = startingIntent.getIntExtra("TYPE", 0);
+		
 
 		setContentView(R.layout.main);
 		mSurface = (SurfaceView) findViewById(R.id.surface);
@@ -261,7 +284,6 @@ public class TacticalDance extends Activity implements Callback {
 		mConnection = new Connection(this, serviceReadyListener);
 		mHolder.addCallback(self);
 
-		
 	}
 
 	@Override
@@ -354,7 +376,10 @@ public class TacticalDance extends Activity implements Callback {
 				try {
 					Thread.sleep(5);
 					draw();
-					if (TYPE == 0 && gameStarted) {
+					if(winningDevices == 1){
+						Toast.makeText(getApplicationContext(), "You Win!", Toast.LENGTH_LONG).show();
+					}
+					if (TYPE == 0 && gameStarted && isWinning && winningDevices!=1) {
 						if (!newSong) {
 							oldTime = 0 + System.currentTimeMillis();
 							newSong = true;
@@ -366,7 +391,6 @@ public class TacticalDance extends Activity implements Callback {
 								newSong = false;
 								currentThresh = (int) (Math.random() * 3);
 								switchSong();
-								
 
 							}
 						}
@@ -391,6 +415,7 @@ public class TacticalDance extends Activity implements Callback {
 	}
 
 	public void restartGame() {
+		winningDevices = rivalDevices.size();
 		currentThresh = 0;
 		isWinning = true;
 		bgPaint.setColor(Color.MAGENTA);
@@ -411,7 +436,16 @@ public class TacticalDance extends Activity implements Callback {
 				songs.seekTo(delayTime);
 			}
 
-			sendMessage("CurrentThresh", currentThresh + ":Systime:" + System.currentTimeMillis());
+			v.vibrate(250);
+			sendMessage("CurrentThresh",
+					currentThresh + ":Systime:" + System.currentTimeMillis());
+			if (currentThresh == 0) {
+				bgPaint.setColor(Color.RED);
+			} else if (currentThresh == 1) {
+				bgPaint.setColor(Color.YELLOW);
+			} else {
+				bgPaint.setColor(Color.GREEN);
+			}
 			songs.start();
 
 		} catch (IllegalStateException e) {
