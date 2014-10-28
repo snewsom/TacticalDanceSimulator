@@ -21,11 +21,8 @@
 package edu.elon.tds;
 
 import net.clc.bt.R;
-import net.clc.bt.R.id;
-import net.clc.bt.R.layout;
 import android.app.Activity;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.view.View.OnClickListener;

@@ -8,10 +8,6 @@ import net.clc.bt.Connection.OnConnectionServiceReadyListener;
 import net.clc.bt.Connection.OnIncomingConnectionListener;
 import net.clc.bt.Connection.OnMaxConnectionsReachedListener;
 import net.clc.bt.Connection.OnMessageReceivedListener;
-import net.clc.bt.R.drawable;
-import net.clc.bt.R.id;
-import net.clc.bt.R.layout;
-import net.clc.bt.R.raw;
 import android.app.Activity;
 import android.app.AlertDialog.Builder;
 import android.content.Context;
@@ -19,38 +15,29 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.DialogInterface.OnClickListener;
 import android.content.res.AssetFileDescriptor;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Point;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.media.AudioManager;
 import android.media.MediaPlayer;
-import android.media.SoundPool;
 import android.os.Bundle;
 import android.os.Vibrator;
-import android.util.Log;
-import android.view.Display;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.View;
-import android.view.WindowManager;
 import android.view.SurfaceHolder.Callback;
 import android.view.WindowManager.BadTokenException;
-import android.widget.Button;
 import android.widget.Toast;
 
-import java.io.FileDescriptor;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class TacticalDance extends Activity implements Callback {
 
@@ -74,8 +61,6 @@ public class TacticalDance extends Activity implements Callback {
 
 	private ArrayList<String> rivalDevices = new ArrayList<String>();
 
-	private SoundPool mSoundPool;
-
 	private ArrayList<AssetFileDescriptor> songList;
 
 	private MediaPlayer songs;
@@ -83,16 +68,16 @@ public class TacticalDance extends Activity implements Callback {
 	private SensorManager sensorManager;
 	private SensorEventListener sensorListener;
 
+	public Map<String, Boolean> players = new HashMap<String, Boolean>();
+
 	private Vibrator v;
 
 	public boolean isWinning = true;
 	public boolean gameStarted = false;
 
 	private final float[] THRESHOLDS = { 12, 20, 30 };
-	private final int THRESHOLD_LOW = 0;
-	private final int THRESHOLD_MED = 1;
-	private final int THRESHOLD_HIGH = 2;
-	private int currentThresh = THRESHOLD_LOW;
+
+	private int currentThresh = 0;
 
 	private int delayTime = 0;
 
@@ -109,22 +94,43 @@ public class TacticalDance extends Activity implements Callback {
 	private OnMessageReceivedListener dataReceivedListener = new OnMessageReceivedListener() {
 		public void OnMessageReceived(String device, String message) {
 			String[] array = message.split(":");
+			System.out.println(device + " : " + message);
 			if (array[0].equals("CurrentThresh")) {
 				currentThresh = Integer.parseInt(array[1]);
-				delayTime = (int) (System.currentTimeMillis() - Long
-						.parseLong(array[3]));
-				delayTime = Math.abs(delayTime);
-				System.out.println("delay time: " + delayTime);
-				if (isWinning) {
+				// delayTime = (int) (System.currentTimeMillis() - Long
+				// .parseLong(array[3]));
+				// delayTime = Math.abs(delayTime);
+				// System.out.println("delay time: " + delayTime);
+				if (isWinning && TYPE == 1) {
 					switchSong();
 				}
 			}
 			if (array[0].equals("RestartGame")) {
+				if(TYPE == 0){
+					sendMessage("RestartGame","");
+				}
 				restartGame();
 			}
 			// received if client devices lose
-			if (message.equals("Update:Lost")) {
-				winningDevices--;
+			if (array[0].equals("PlayerLost")) {
+				System.out.println("Player Lost!");
+				if (TYPE == 0) {
+					System.out.println(winningDevices);
+					winningDevices--;
+					checkWinner();
+					if (winningDevices == 1) {
+						sendMessage("CheckWinner", "");
+						winningDevices = 1 + rivalDevices.size();
+					}
+					if(winningDevices == 0) {
+						noWinner();
+					}
+				}
+				players.put(device, false);
+			}
+			if (array[0].equals("CheckWinner")) {
+				System.out.println("Checking winner...");
+				checkWinner();
 			}
 
 		}
@@ -140,12 +146,15 @@ public class TacticalDance extends Activity implements Callback {
 		public void OnIncomingConnection(String device) {
 			if (!rivalDevices.contains(device)) {
 				rivalDevices.add(device);
+				winningDevices++;
+				players.put(device, true);
 			}
 			// for debug
 			for (String s : rivalDevices) {
 				System.out.println(s);
 			}
 			gameStarted = true;
+			System.out.println("Game Started");
 			switchSong();
 		}
 	};
@@ -199,8 +208,61 @@ public class TacticalDance extends Activity implements Callback {
 	};
 
 	private void sendMessage(String messageType, String message) {
-		for (String device : rivalDevices) {
-			mConnection.sendMessage(device, messageType + ":" + message);
+		if (TYPE == 0) {
+			for (String device : rivalDevices) {
+				mConnection.sendMessage(device, messageType + ":" + message);
+			}
+		} else {
+			mConnection.sendMessage(hostDevice, messageType + ":" + message);
+		}
+	}
+
+	protected void noWinner() {
+		v.vibrate(1000);
+		bgPaint.setColor(Color.GRAY);
+		try {
+			Thread.sleep(1000);
+			sendMessage("RestartGame", "");
+			if (TYPE == 0) {
+				restartGame();
+			}
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+
+	protected void checkWinner() {
+		if (isWinning) {
+			win();
+		}
+	}
+
+	protected void win() {
+		System.out.println("you win");
+		v.vibrate(1000);
+		try {
+			for (int i = 0; i < 10; i++) {
+				bgPaint.setColor(Color.argb(255, 255, 165, 0));
+				Thread.sleep(100);
+				bgPaint.setColor(Color.YELLOW);
+				Thread.sleep(100);
+				bgPaint.setColor(Color.GREEN);
+				Thread.sleep(100);
+				bgPaint.setColor(Color.BLUE);
+				Thread.sleep(100);
+				bgPaint.setColor(Color.CYAN);
+				Thread.sleep(100);
+				bgPaint.setColor(Color.argb(255, 125, 38, 205));
+				Thread.sleep(100);
+				bgPaint.setColor(Color.RED);
+			}
+			sendMessage("RestartGame", "");
+			if (TYPE == 0) {
+				restartGame();
+			}
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 
@@ -212,6 +274,7 @@ public class TacticalDance extends Activity implements Callback {
 
 		}
 
+		@SuppressWarnings("static-access")
 		@Override
 		public void onSensorChanged(SensorEvent se) {
 			// algorithm for seeing if phone is jostled
@@ -234,7 +297,16 @@ public class TacticalDance extends Activity implements Callback {
 						v.vibrate(500);
 						bgPaint.setColor(Color.CYAN);
 						isWinning = false;
-						sendMessage("Update", "Lost");
+						if (TYPE == 0) {
+							winningDevices--;
+							System.out.println("winning devices is "
+									+ winningDevices);
+							if (winningDevices == 1) {
+								sendMessage("CheckWinner", "");
+							}
+						} else {
+							sendMessage("PlayerLost", "");
+						}
 
 					}
 					count = 0;
@@ -258,6 +330,10 @@ public class TacticalDance extends Activity implements Callback {
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
+		if (TYPE == 0) {
+			players.put(hostDevice, true);
+			winningDevices = 1 + rivalDevices.size();
+		}
 
 		sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
 		sensorListener = new SensorListener();
@@ -315,7 +391,6 @@ public class TacticalDance extends Activity implements Callback {
 	}
 
 	private void doDraw(Canvas c) {
-		// do some drawin stuff like...
 		c.drawRect(0, 0, c.getWidth(), c.getHeight(), bgPaint);
 	}
 
@@ -354,8 +429,8 @@ public class TacticalDance extends Activity implements Callback {
 			int connectionStatus = mConnection.connect(device,
 					dataReceivedListener, disconnectedListener);
 			if (connectionStatus != Connection.SUCCESS) {
-				Toast.makeText(self, "Unable to connect; please try again.", 1)
-						.show();
+				Toast.makeText(self, "Unable to connect; please try again.",
+						Toast.LENGTH_SHORT).show();
 			} else {
 				// TODO i dont know if i wanna set host here
 				gameStarted = true;
@@ -381,12 +456,12 @@ public class TacticalDance extends Activity implements Callback {
 					Thread.sleep(0);
 					// Thread.sleep(5);
 					draw();
-					if (winningDevices == 1) {
-						// Toast.makeText(getApplicationContext(), "You Win!",
-						// Toast.LENGTH_LONG).show();
-						bgPaint.setColor(Color.GRAY);
-						winningDevices = 0;
-					}
+					// if (winningDevices == 1) {
+					// // Toast.makeText(getApplicationContext(), "You Win!",
+					// // Toast.LENGTH_LONG).show();
+					// bgPaint.setColor(Color.GRAY);
+					//
+					// }
 					if (TYPE == 0 && gameStarted && isWinning
 							&& winningDevices != 1) {
 						if (!newSong) {
@@ -397,6 +472,8 @@ public class TacticalDance extends Activity implements Callback {
 							// System.out.println(System.currentTimeMillis() -
 							// oldTime);
 							if (System.currentTimeMillis() - oldTime >= 30000) {
+								System.out
+										.println("Time elapsed. Song Switched.");
 								newSong = false;
 								currentThresh = (int) (Math.random() * 3);
 								switchSong();
@@ -419,12 +496,15 @@ public class TacticalDance extends Activity implements Callback {
 
 	public boolean serverRestartGame(MenuItem menuItem) {
 		sendMessage("RestartGame", "");
+		winningDevices = rivalDevices.size() + 1;
 		restartGame();
 		return true;
 	}
 
 	public void restartGame() {
-		winningDevices = rivalDevices.size();
+		System.out.println("Game Restarted");
+		oldTime = System.currentTimeMillis();
+		winningDevices = rivalDevices.size() + 1;
 		currentThresh = 0;
 		isWinning = true;
 		bgPaint.setColor(Color.MAGENTA);
@@ -433,6 +513,7 @@ public class TacticalDance extends Activity implements Callback {
 
 	private void switchSong() {
 		try {
+			System.out.println("Song Switched");
 			AssetFileDescriptor song = songList.get(currentThresh);
 			songs.stop();
 			songs.reset();
@@ -441,8 +522,10 @@ public class TacticalDance extends Activity implements Callback {
 			songs.prepare();
 
 			v.vibrate(250);
-			sendMessage("CurrentThresh",
-					currentThresh + ":Systime:" + System.currentTimeMillis());
+			if (TYPE == 0) {
+				sendMessage("CurrentThresh", currentThresh + ":Systime:"
+						+ System.currentTimeMillis());
+			}
 			if (currentThresh == 0) {
 				bgPaint.setColor(Color.RED);
 			} else if (currentThresh == 1) {
@@ -451,8 +534,6 @@ public class TacticalDance extends Activity implements Callback {
 				bgPaint.setColor(Color.GREEN);
 			}
 			if (TYPE == 0) {
-				// trying to make the music sync better accross phones.
-				// to make for delay in message being reseaved.
 				Thread.sleep(200);
 			}
 			songs.start();
