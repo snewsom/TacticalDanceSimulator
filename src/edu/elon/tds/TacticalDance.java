@@ -77,7 +77,7 @@ public class TacticalDance extends Activity implements Callback {
 
 	private final float[] THRESHOLDS = { 12, 20, 30 };
 
-	private int currentThresh = 0;
+	private int currentThresh = 1;
 
 	private int delayTime = 0;
 
@@ -117,8 +117,8 @@ public class TacticalDance extends Activity implements Callback {
 				if (TYPE == 0) {
 					System.out.println(winningDevices);
 					winningDevices--;
-					checkWinner();
 					if (winningDevices == 1) {
+						checkWinner();
 						sendMessage("CheckWinner", "");
 						winningDevices = 1 + rivalDevices.size();
 					}
@@ -359,7 +359,7 @@ public class TacticalDance extends Activity implements Callback {
 		songList.add(this.getResources().openRawResourceFd(R.raw.level2));
 		songList.add(this.getResources().openRawResourceFd(R.raw.level3));
 
-		songs = MediaPlayer.create(this, R.raw.level1);
+		songs = MediaPlayer.create(this, R.raw.level2);
 
 		mConnection = new Connection(this, serviceReadyListener);
 		mHolder.addCallback(self);
@@ -471,7 +471,7 @@ public class TacticalDance extends Activity implements Callback {
 						} else {
 							// System.out.println(System.currentTimeMillis() -
 							// oldTime);
-							if (System.currentTimeMillis() - oldTime >= 30000) {
+							if (System.currentTimeMillis() - oldTime >= 15000) {
 								System.out
 										.println("Time elapsed. Song Switched.");
 								newSong = false;
