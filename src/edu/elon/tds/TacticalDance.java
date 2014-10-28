@@ -224,20 +224,25 @@ public class TacticalDance extends Activity implements Callback {
 				// System.out.println(sum);
 				if (count >= 10) {
 					if (sum / count > THRESHOLDS[currentThresh]) {
-						if (songs.isPlaying()) {
-							songs.stop();
-						} else
-							v.vibrate(500);
+						try {
+							if (songs.isPlaying()) {
+								songs.stop();
+							}
+						} catch (IllegalStateException e) {
+
+						}
+						v.vibrate(500);
 						bgPaint.setColor(Color.CYAN);
 						isWinning = false;
 						sendMessage("Update", "Lost");
-					}
 
+					}
+					count = 0;
+					sum = 0;
 				}
-				count = 0;
-				sum = 0;
 			}
 		}
+
 	}
 
 	@Override
@@ -428,9 +433,9 @@ public class TacticalDance extends Activity implements Callback {
 
 	private void switchSong() {
 		try {
+			AssetFileDescriptor song = songList.get(currentThresh);
 			songs.stop();
 			songs.reset();
-			AssetFileDescriptor song = songList.get(currentThresh);
 			songs.setDataSource(song.getFileDescriptor(),
 					song.getStartOffset(), song.getDeclaredLength());
 			songs.prepare();
