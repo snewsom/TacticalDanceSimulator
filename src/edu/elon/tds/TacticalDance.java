@@ -101,7 +101,7 @@ public class TacticalDance extends Activity implements Callback {
 
 	float sum = 0;
 	int count = 0;
-	
+
 	int winningDevices;
 
 	GameLoop gLoop;
@@ -115,18 +115,18 @@ public class TacticalDance extends Activity implements Callback {
 						.parseLong(array[3]));
 				delayTime = Math.abs(delayTime);
 				System.out.println("delay time: " + delayTime);
-				if(isWinning){
+				if (isWinning) {
 					switchSong();
 				}
 			}
 			if (array[0].equals("RestartGame")) {
 				restartGame();
 			}
-			//received if client devices lose
-			if(message.equals("Update:Lost")){
+			// received if client devices lose
+			if (message.equals("Update:Lost")) {
 				winningDevices--;
 			}
-			
+
 		}
 	};
 
@@ -224,20 +224,20 @@ public class TacticalDance extends Activity implements Callback {
 				// System.out.println(sum);
 				if (count >= 10) {
 					if (sum / count > THRESHOLDS[currentThresh]) {
-						songs.stop();
-						v.vibrate(500);
+						if (songs.isPlaying()) {
+							songs.stop();
+						} else
+							v.vibrate(500);
 						bgPaint.setColor(Color.CYAN);
 						isWinning = false;
-						sendMessage("Update","Lost");
-						
-
+						sendMessage("Update", "Lost");
 					}
-					count = 0;
-					sum = 0;
+
 				}
+				count = 0;
+				sum = 0;
 			}
 		}
-
 	}
 
 	@Override
@@ -265,7 +265,6 @@ public class TacticalDance extends Activity implements Callback {
 		v = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
 		Intent startingIntent = getIntent();
 		TYPE = startingIntent.getIntExtra("TYPE", 0);
-		
 
 		setContentView(R.layout.main);
 		mSurface = (SurfaceView) findViewById(R.id.surface);
@@ -374,12 +373,17 @@ public class TacticalDance extends Activity implements Callback {
 		public void run() {
 			while (running) {
 				try {
-					Thread.sleep(5);
+					Thread.sleep(0);
+					// Thread.sleep(5);
 					draw();
-					if(winningDevices == 1){
-						Toast.makeText(getApplicationContext(), "You Win!", Toast.LENGTH_LONG).show();
+					if (winningDevices == 1) {
+						// Toast.makeText(getApplicationContext(), "You Win!",
+						// Toast.LENGTH_LONG).show();
+						bgPaint.setColor(Color.GRAY);
+						winningDevices = 0;
 					}
-					if (TYPE == 0 && gameStarted && isWinning && winningDevices!=1) {
+					if (TYPE == 0 && gameStarted && isWinning
+							&& winningDevices != 1) {
 						if (!newSong) {
 							oldTime = 0 + System.currentTimeMillis();
 							newSong = true;
@@ -387,7 +391,7 @@ public class TacticalDance extends Activity implements Callback {
 						} else {
 							// System.out.println(System.currentTimeMillis() -
 							// oldTime);
-							if (System.currentTimeMillis() - oldTime >= 5000) {
+							if (System.currentTimeMillis() - oldTime >= 30000) {
 								newSong = false;
 								currentThresh = (int) (Math.random() * 3);
 								switchSong();
@@ -430,11 +434,6 @@ public class TacticalDance extends Activity implements Callback {
 			songs.setDataSource(song.getFileDescriptor(),
 					song.getStartOffset(), song.getDeclaredLength());
 			songs.prepare();
-			if (TYPE == 1) {
-				// trying to make the music sync better accross phones.
-				// to make for delay in message being reseaved.
-				songs.seekTo(delayTime);
-			}
 
 			v.vibrate(250);
 			sendMessage("CurrentThresh",
@@ -446,12 +445,20 @@ public class TacticalDance extends Activity implements Callback {
 			} else {
 				bgPaint.setColor(Color.GREEN);
 			}
+			if (TYPE == 0) {
+				// trying to make the music sync better accross phones.
+				// to make for delay in message being reseaved.
+				Thread.sleep(200);
+			}
 			songs.start();
 
 		} catch (IllegalStateException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
