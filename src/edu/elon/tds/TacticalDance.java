@@ -106,8 +106,8 @@ public class TacticalDance extends Activity implements Callback {
 				}
 			}
 			if (array[0].equals("RestartGame")) {
-				if(TYPE == 0){
-					sendMessage("RestartGame","");
+				if (TYPE == 0) {
+					sendMessage("RestartGame", "");
 				}
 				restartGame();
 			}
@@ -122,7 +122,7 @@ public class TacticalDance extends Activity implements Callback {
 						sendMessage("CheckWinner", "");
 						winningDevices = 1 + rivalDevices.size();
 					}
-					if(winningDevices == 0) {
+					if (winningDevices == 0) {
 						noWinner();
 					}
 				}
@@ -163,26 +163,28 @@ public class TacticalDance extends Activity implements Callback {
 		public void OnConnectionLost(String device) {
 			class displayConnectionLostAlert implements Runnable {
 				public void run() {
-					Builder connectionLostAlert = new Builder(self);
+					//if (TYPE != 0 || rivalDevices.size() == 1) {
+						Builder connectionLostAlert = new Builder(self);
 
-					connectionLostAlert.setTitle("Connection lost");
-					connectionLostAlert
-							.setMessage("Your connection with the other player has been lost.");
+						connectionLostAlert.setTitle("Connection lost");
+						connectionLostAlert
+								.setMessage("Your connection with the other player has been lost.");
 
-					connectionLostAlert.setPositiveButton("Ok",
-							new OnClickListener() {
-								public void onClick(DialogInterface dialog,
-										int which) {
-									finish();
-								}
-							});
-					connectionLostAlert.setCancelable(false);
-					try {
-						connectionLostAlert.show();
-					} catch (BadTokenException e) {
+						connectionLostAlert.setPositiveButton("Ok",
+								new OnClickListener() {
+									public void onClick(DialogInterface dialog,
+											int which) {
+										finish();
+									}
+								});
+						connectionLostAlert.setCancelable(false);
+						try {
+							connectionLostAlert.show();
+						} catch (BadTokenException e) {
+						}
 					}
 				}
-			}
+			//}
 			self.runOnUiThread(new displayConnectionLostAlert());
 		}
 	};
@@ -240,6 +242,7 @@ public class TacticalDance extends Activity implements Callback {
 	protected void win() {
 		System.out.println("you win");
 		v.vibrate(1000);
+		winSound();
 		try {
 			for (int i = 0; i < 10; i++) {
 				bgPaint.setColor(Color.argb(255, 255, 165, 0));
@@ -296,6 +299,7 @@ public class TacticalDance extends Activity implements Callback {
 						}
 						v.vibrate(500);
 						bgPaint.setColor(Color.CYAN);
+						loseSound();
 						isWinning = false;
 						if (TYPE == 0) {
 							winningDevices--;
@@ -358,6 +362,8 @@ public class TacticalDance extends Activity implements Callback {
 		songList.add(this.getResources().openRawResourceFd(R.raw.level1));
 		songList.add(this.getResources().openRawResourceFd(R.raw.level2));
 		songList.add(this.getResources().openRawResourceFd(R.raw.level3));
+		songList.add(this.getResources().openRawResourceFd(R.raw.airhorn));
+		songList.add(this.getResources().openRawResourceFd(R.raw.nyan));
 
 		songs = MediaPlayer.create(this, R.raw.level2);
 
@@ -548,5 +554,49 @@ public class TacticalDance extends Activity implements Callback {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+
+	private void loseSound() {
+		try {
+			AssetFileDescriptor song = songList.get(3);
+			songs.stop();
+			songs.reset();
+			songs.setDataSource(song.getFileDescriptor(),
+					song.getStartOffset(), song.getDeclaredLength());
+			songs.prepare();
+			songs.start();
+		} catch (IllegalArgumentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalStateException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+
+	private void winSound() {
+		try {
+			AssetFileDescriptor song = songList.get(4);
+			songs.stop();
+			songs.reset();
+			songs.setDataSource(song.getFileDescriptor(),
+					song.getStartOffset(), song.getDeclaredLength());
+			songs.prepare();
+			songs.start();
+		} catch (IllegalArgumentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalStateException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 	}
 }
