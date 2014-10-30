@@ -33,6 +33,7 @@ import android.view.SurfaceView;
 import android.view.SurfaceHolder.Callback;
 import android.view.WindowManager.BadTokenException;
 import android.widget.Toast;
+
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -62,6 +63,7 @@ public class TacticalDance extends Activity implements Callback {
 	float sum = 0;
 	int count = 0;
 	int winningDevices;
+	int loseCount;
 	GameLoop gLoop;
 
 	private OnMessageReceivedListener dataReceivedListener = new OnMessageReceivedListener() {
@@ -83,17 +85,24 @@ public class TacticalDance extends Activity implements Callback {
 				if (TYPE == 0) {
 					System.out.println(winningDevices);
 					winningDevices--;
-					if (winningDevices == 1) {
+					if (winningDevices <= 1) {
 						if (!checkWinner()) {
 							sendMessage("CheckWinner", "");
 						}
 						winningDevices = 1 + rivalDevices.size();
 					}
-					// theoretically impossible, realistically improbable
-					if (winningDevices == 0) {
-						noWinner();
-					}
 				}
+			}
+			if (array[0].equals("LoseCount")) {
+				loseCount++;
+				// theoretically impossible, realistically improbable
+				if (loseCount == rivalDevices.size()) {
+					sendMessage("NoWinner", "");
+					noWinner();
+				}
+			}
+			if (array[0].equals("NoWinner")) {
+				noWinner();
 			}
 			if (array[0].equals("CheckWinner")) {
 				System.out.println("Checking winner...");
@@ -185,6 +194,8 @@ public class TacticalDance extends Activity implements Callback {
 		if (isWinning) {
 			win();
 			return true;
+		} else if (TYPE == 1) {
+			sendMessage("LoseCount", "");
 		}
 		return false;
 	}
@@ -229,19 +240,25 @@ public class TacticalDance extends Activity implements Callback {
 		System.out.println("Game Restarted");
 		isWinning = true;
 		if (TYPE == 0) {
+			loseCount = 0;
 			winningDevices = rivalDevices.size() + 1;
 			oldTime = System.currentTimeMillis();
 			currentThresh = 0;
 			sendMessage("RestartGame", "");
+			try {
+				Thread.sleep(500);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
 			switchSong();
 		}
 	}
 
 	protected void noWinner() {
-		v.vibrate(1000);
+		v.vibrate(2000);
 		bgPaint.setColor(Color.GRAY);
 		try {
-			Thread.sleep(1000);
+			Thread.sleep(5000);
 			if (TYPE == 0) {
 				restartGame();
 			}
@@ -249,8 +266,7 @@ public class TacticalDance extends Activity implements Callback {
 			e.printStackTrace();
 		}
 	}
-	
-	
+
 	private class SensorListener implements SensorEventListener {
 
 		@Override
@@ -316,7 +332,7 @@ public class TacticalDance extends Activity implements Callback {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
 		if (TYPE == 0) {
-			winningDevices = 1 + rivalDevices.size();
+			winningDevices = 1;
 		}
 
 		sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
