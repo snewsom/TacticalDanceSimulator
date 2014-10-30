@@ -42,53 +42,29 @@ import java.util.Map;
 public class TacticalDance extends Activity implements Callback {
 
 	public static final String TAG = "TacticalDance";
-
 	private static final int SERVER_LIST_RESULT_CODE = 42;
-
 	private TacticalDance self;
-
 	private int TYPE; // 0 = server, 1 = client
-
 	private SurfaceView mSurface;
-
 	private SurfaceHolder mHolder;
-
 	private Paint bgPaint;
-
 	private Connection mConnection;
-
 	private String hostDevice = "";
-
 	private ArrayList<String> rivalDevices = new ArrayList<String>();
-
 	private ArrayList<AssetFileDescriptor> songList;
-
 	private MediaPlayer songs;
-
 	private SensorManager sensorManager;
 	private SensorEventListener sensorListener;
-
-	public Map<String, Boolean> players = new HashMap<String, Boolean>();
-
 	private Vibrator v;
-
 	public boolean isWinning = true;
 	public boolean gameStarted = false;
-
 	private final float[] THRESHOLDS = { 12, 20, 30 };
-
 	private int currentThresh = 1;
-
-	private int delayTime = 0;
-
 	private long oldTime = 0;
 	private boolean newSong = false;
-
 	float sum = 0;
 	int count = 0;
-
 	int winningDevices;
-
 	GameLoop gLoop;
 
 	private OnMessageReceivedListener dataReceivedListener = new OnMessageReceivedListener() {
@@ -97,42 +73,35 @@ public class TacticalDance extends Activity implements Callback {
 			System.out.println(device + " : " + message);
 			if (array[0].equals("CurrentThresh")) {
 				currentThresh = Integer.parseInt(array[1]);
-				// delayTime = (int) (System.currentTimeMillis() - Long
-				// .parseLong(array[3]));
-				// delayTime = Math.abs(delayTime);
-				// System.out.println("delay time: " + delayTime);
 				if (isWinning && TYPE == 1) {
 					switchSong();
 				}
 			}
 			if (array[0].equals("RestartGame")) {
-				if (TYPE == 0) {
-					sendMessage("RestartGame", "");
-				}
 				restartGame();
 			}
 			// received if client devices lose
 			if (array[0].equals("PlayerLost")) {
-				System.out.println("Player Lost!");
+				System.out.println("A player lost!");
 				if (TYPE == 0) {
 					System.out.println(winningDevices);
 					winningDevices--;
 					if (winningDevices == 1) {
-						checkWinner();
-						sendMessage("CheckWinner", "");
+						if (!checkWinner()) {
+							sendMessage("CheckWinner", "");
+						}
 						winningDevices = 1 + rivalDevices.size();
 					}
+					// theoretically impossible, realistically improbable
 					if (winningDevices == 0) {
 						noWinner();
 					}
 				}
-				players.put(device, false);
 			}
 			if (array[0].equals("CheckWinner")) {
 				System.out.println("Checking winner...");
 				checkWinner();
 			}
-
 		}
 	};
 
@@ -146,15 +115,13 @@ public class TacticalDance extends Activity implements Callback {
 		public void OnIncomingConnection(String device) {
 			if (!rivalDevices.contains(device)) {
 				rivalDevices.add(device);
-				winningDevices++;
-				players.put(device, true);
+				winningDevices = 1 + rivalDevices.size();
 			}
-			// for debug
 			for (String s : rivalDevices) {
 				System.out.println(s);
 			}
 			gameStarted = true;
-			System.out.println("Game Started");
+			System.out.println("Game started!");
 			switchSong();
 		}
 	};
@@ -163,28 +130,27 @@ public class TacticalDance extends Activity implements Callback {
 		public void OnConnectionLost(String device) {
 			class displayConnectionLostAlert implements Runnable {
 				public void run() {
-					//if (TYPE != 0 || rivalDevices.size() == 1) {
-						Builder connectionLostAlert = new Builder(self);
+					Builder connectionLostAlert = new Builder(self);
 
-						connectionLostAlert.setTitle("Connection lost");
-						connectionLostAlert
-								.setMessage("Your connection with the other player has been lost.");
+					connectionLostAlert.setTitle("Connection lost");
+					connectionLostAlert
+							.setMessage("Your connection with the other player has been lost.");
 
-						connectionLostAlert.setPositiveButton("Ok",
-								new OnClickListener() {
-									public void onClick(DialogInterface dialog,
-											int which) {
-										finish();
-									}
-								});
-						connectionLostAlert.setCancelable(false);
-						try {
-							connectionLostAlert.show();
-						} catch (BadTokenException e) {
-						}
+					connectionLostAlert.setPositiveButton("Ok",
+							new OnClickListener() {
+								public void onClick(DialogInterface dialog,
+										int which) {
+									finish();
+								}
+							});
+					connectionLostAlert.setCancelable(false);
+					try {
+						connectionLostAlert.show();
+					} catch (BadTokenException e) {
 					}
 				}
-			//}
+			}
+			// }
 			self.runOnUiThread(new displayConnectionLostAlert());
 		}
 	};
@@ -224,7 +190,6 @@ public class TacticalDance extends Activity implements Callback {
 		bgPaint.setColor(Color.GRAY);
 		try {
 			Thread.sleep(1000);
-			sendMessage("RestartGame", "");
 			if (TYPE == 0) {
 				restartGame();
 			}
@@ -233,10 +198,12 @@ public class TacticalDance extends Activity implements Callback {
 		}
 	}
 
-	protected void checkWinner() {
+	protected boolean checkWinner() {
 		if (isWinning) {
 			win();
+			return true;
 		}
+		return false;
 	}
 
 	protected void win() {
@@ -259,12 +226,12 @@ public class TacticalDance extends Activity implements Callback {
 				Thread.sleep(100);
 				bgPaint.setColor(Color.RED);
 			}
-			sendMessage("RestartGame", "");
 			if (TYPE == 0) {
 				restartGame();
+			} else {
+				sendMessage("RestartGame", "");
 			}
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -273,7 +240,6 @@ public class TacticalDance extends Activity implements Callback {
 
 		@Override
 		public void onAccuracyChanged(Sensor arg0, int arg1) {
-			// TODO Auto-generated method stub
 
 		}
 
@@ -287,7 +253,6 @@ public class TacticalDance extends Activity implements Callback {
 				float z = Math.abs(se.values[2]);
 				sum += (x + y + z) - sensorManager.GRAVITY_EARTH;
 				count++;
-				// System.out.println(sum);
 				if (count >= 10) {
 					if (sum / count > THRESHOLDS[currentThresh]) {
 						try {
@@ -303,8 +268,9 @@ public class TacticalDance extends Activity implements Callback {
 						isWinning = false;
 						if (TYPE == 0) {
 							winningDevices--;
-							System.out.println("winning devices is "
-									+ winningDevices);
+							System.out
+									.println("Number of devices left in the game: "
+											+ winningDevices);
 							if (winningDevices == 1) {
 								sendMessage("CheckWinner", "");
 							}
@@ -335,7 +301,6 @@ public class TacticalDance extends Activity implements Callback {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.main);
 		if (TYPE == 0) {
-			players.put(hostDevice, true);
 			winningDevices = 1 + rivalDevices.size();
 		}
 
@@ -362,8 +327,8 @@ public class TacticalDance extends Activity implements Callback {
 		songList.add(this.getResources().openRawResourceFd(R.raw.level1));
 		songList.add(this.getResources().openRawResourceFd(R.raw.level2));
 		songList.add(this.getResources().openRawResourceFd(R.raw.level3));
-		songList.add(this.getResources().openRawResourceFd(R.raw.airhorn));
-		songList.add(this.getResources().openRawResourceFd(R.raw.nyan));
+		songList.add(this.getResources().openRawResourceFd(R.raw.lose));
+		songList.add(this.getResources().openRawResourceFd(R.raw.win));
 
 		songs = MediaPlayer.create(this, R.raw.level2);
 
@@ -438,7 +403,6 @@ public class TacticalDance extends Activity implements Callback {
 				Toast.makeText(self, "Unable to connect; please try again.",
 						Toast.LENGTH_SHORT).show();
 			} else {
-				// TODO i dont know if i wanna set host here
 				gameStarted = true;
 				songs.start();
 				hostDevice = device;
@@ -460,14 +424,7 @@ public class TacticalDance extends Activity implements Callback {
 			while (running) {
 				try {
 					Thread.sleep(0);
-					// Thread.sleep(5);
 					draw();
-					// if (winningDevices == 1) {
-					// // Toast.makeText(getApplicationContext(), "You Win!",
-					// // Toast.LENGTH_LONG).show();
-					// bgPaint.setColor(Color.GRAY);
-					//
-					// }
 					if (TYPE == 0 && gameStarted && isWinning
 							&& winningDevices != 1) {
 						if (!newSong) {
@@ -475,8 +432,6 @@ public class TacticalDance extends Activity implements Callback {
 							newSong = true;
 							System.out.println(newSong + "" + oldTime);
 						} else {
-							// System.out.println(System.currentTimeMillis() -
-							// oldTime);
 							if (System.currentTimeMillis() - oldTime >= 15000) {
 								System.out
 										.println("Time elapsed. Song Switched.");
@@ -501,20 +456,21 @@ public class TacticalDance extends Activity implements Callback {
 	}
 
 	public boolean serverRestartGame(MenuItem menuItem) {
-		sendMessage("RestartGame", "");
-		winningDevices = rivalDevices.size() + 1;
 		restartGame();
 		return true;
 	}
 
 	public void restartGame() {
-		System.out.println("Game Restarted");
-		oldTime = System.currentTimeMillis();
-		winningDevices = rivalDevices.size() + 1;
-		currentThresh = 0;
-		isWinning = true;
 		bgPaint.setColor(Color.MAGENTA);
-		switchSong();
+		System.out.println("Game Restarted");
+		isWinning = true;
+		if (TYPE == 0) {
+			winningDevices = rivalDevices.size() + 1;
+			oldTime = System.currentTimeMillis();
+			currentThresh = 0;
+			sendMessage("RestartGame", "");
+			switchSong();
+		}
 	}
 
 	private void switchSong() {
@@ -545,13 +501,10 @@ public class TacticalDance extends Activity implements Callback {
 			songs.start();
 
 		} catch (IllegalStateException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -566,13 +519,10 @@ public class TacticalDance extends Activity implements Callback {
 			songs.prepare();
 			songs.start();
 		} catch (IllegalArgumentException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IllegalStateException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
@@ -588,13 +538,10 @@ public class TacticalDance extends Activity implements Callback {
 			songs.prepare();
 			songs.start();
 		} catch (IllegalArgumentException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IllegalStateException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
