@@ -33,11 +33,8 @@ import android.view.SurfaceView;
 import android.view.SurfaceHolder.Callback;
 import android.view.WindowManager.BadTokenException;
 import android.widget.Toast;
-
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 
 public class TacticalDance extends Activity implements Callback {
 
@@ -150,7 +147,6 @@ public class TacticalDance extends Activity implements Callback {
 					}
 				}
 			}
-			// }
 			self.runOnUiThread(new displayConnectionLostAlert());
 		}
 	};
@@ -182,19 +178,6 @@ public class TacticalDance extends Activity implements Callback {
 			}
 		} else {
 			mConnection.sendMessage(hostDevice, messageType + ":" + message);
-		}
-	}
-
-	protected void noWinner() {
-		v.vibrate(1000);
-		bgPaint.setColor(Color.GRAY);
-		try {
-			Thread.sleep(1000);
-			if (TYPE == 0) {
-				restartGame();
-			}
-		} catch (InterruptedException e) {
-			e.printStackTrace();
 		}
 	}
 
@@ -236,6 +219,38 @@ public class TacticalDance extends Activity implements Callback {
 		}
 	}
 
+	public boolean serverRestartGame(MenuItem menuItem) {
+		restartGame();
+		return true;
+	}
+
+	public void restartGame() {
+		bgPaint.setColor(Color.MAGENTA);
+		System.out.println("Game Restarted");
+		isWinning = true;
+		if (TYPE == 0) {
+			winningDevices = rivalDevices.size() + 1;
+			oldTime = System.currentTimeMillis();
+			currentThresh = 0;
+			sendMessage("RestartGame", "");
+			switchSong();
+		}
+	}
+
+	protected void noWinner() {
+		v.vibrate(1000);
+		bgPaint.setColor(Color.GRAY);
+		try {
+			Thread.sleep(1000);
+			if (TYPE == 0) {
+				restartGame();
+			}
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
 	private class SensorListener implements SensorEventListener {
 
 		@Override
@@ -452,24 +467,6 @@ public class TacticalDance extends Activity implements Callback {
 		public void safeStop() {
 			running = false;
 			interrupt();
-		}
-	}
-
-	public boolean serverRestartGame(MenuItem menuItem) {
-		restartGame();
-		return true;
-	}
-
-	public void restartGame() {
-		bgPaint.setColor(Color.MAGENTA);
-		System.out.println("Game Restarted");
-		isWinning = true;
-		if (TYPE == 0) {
-			winningDevices = rivalDevices.size() + 1;
-			oldTime = System.currentTimeMillis();
-			currentThresh = 0;
-			sendMessage("RestartGame", "");
-			switchSong();
 		}
 	}
 
